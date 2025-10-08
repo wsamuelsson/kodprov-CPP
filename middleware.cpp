@@ -65,6 +65,8 @@ int main(int argc, char const *argv[])
     asio::io_context io;
     asio::steady_timer timer(io);
     asio::ip::tcp::iostream input = establish_connection();
+    //Read thread should wait unitl we have established a connection before trying to read from server
+
     std::thread read_thread(server_read_thread, std::ref(input), std::ref(io));
     //Since we are outputting to the user every 1.7 seconds but reading continously we should do this asynchronosly
     
@@ -107,7 +109,7 @@ void get_g_value(const double distance, const uint8_t type, uint8_t *g){
     */
     switch (type)
     {
-    case (uint8_t)1:
+    case 1:
         if(distance < 75){
             if(distance < 50)
                 *g = 0x31; //red
@@ -117,13 +119,13 @@ void get_g_value(const double distance, const uint8_t type, uint8_t *g){
         else
             *g = 0x34; //blue
         break;
-    case (uint8_t)2:
+    case 2:
         if(distance < 50)
             *g = 0x33; //yellow
         else
             *g = 0x34; //blue
         break;
-    case (uint8_t)3:
+    case 3:
         if (distance < 100)
             *g = 0x31; //red
         else
@@ -142,16 +144,21 @@ void parse_line(std::string line, int64_t *id,  int32_t *x, int32_t *y, uint8_t 
     std::string delimiter = ";";
     unsigned int substring_index = 0;
     
-    unsigned int LINE_ELEMENTS = 4;
+    const unsigned int LINE_ELEMENTS = 4;
 
     while (substring_index < LINE_ELEMENTS){
         //Get first substring, when we split by ;
         std::string substring = line.substr(0, line.find(delimiter));
         std::string numeric_value = substring;
         //Get the thing following the equal sign =
-        numeric_value.erase(0, line.find("=")+1);
-        //std::cout << numeric_value << std::endl;
-        //Remove the parsed substring from original string
+        if(line.find("=")+1 < numeric_value.length())
+            numeric_value.erase(0, line.find("=")+1);
+        else{
+            std::clog << "Error in parse_line: Attempting to erase outside of string" << std::endl;
+            throw std::runtime_error("Attempting to erase outside of string");
+        }
+
+        //Remove the parsed substring from original string        
         line.erase(0, substring.length()+1);
         
         //Handle substring based on which index we are using
@@ -202,7 +209,6 @@ void timer_handler(asio::steady_timer &timer, const std::chrono::milliseconds &i
         fflush(stdout);
     }
     else{
-        //No objects to write -- raise error to clog
         std::clog << "Error in timer_handler: No objects read from buffer" << std::endl;
     }
     //Schedule new expiry
