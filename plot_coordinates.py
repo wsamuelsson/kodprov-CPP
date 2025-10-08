@@ -94,7 +94,7 @@ def main():
             
             if count > 0:
                 ax.clear()
-                ax.scatter(150, 150, c='green', s=50, marker='D')
+                ax.scatter(150, 150, color='green', s=50, marker='D')
                 ax.add_patch(circle100)
                 ax.add_patch(circle75)
                 ax.add_patch(circle50)
@@ -106,7 +106,7 @@ def main():
                     color = obj['color']
                     symbol = obj['type']
                     # Plot the new locations
-                    ax.scatter(x_coord, y_coord, c=color, s=50, marker=symbol) 
+                    ax.scatter(x_coord, y_coord, color=color, s=50, marker=symbol) 
                     
                     ax.set_title(f"Objects Received: {count}")
                     ax.set_xlim(0, 300) # Assuming some bounds for coordinates
