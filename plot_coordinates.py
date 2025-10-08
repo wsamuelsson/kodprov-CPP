@@ -15,9 +15,10 @@ def read_binary_data(stream):
     
     # Read Preamble (4 bytes)
     preamble_bytes = stream.read(PREAMBLE_SIZE)
+        
     if not preamble_bytes or len(preamble_bytes) < PREAMBLE_SIZE:
-        return 0, [] # End of stream or incomplete read
-
+        raise EOFError("Input stream closed by middleware.")
+    
     # Unpack the uint32_t preamble (assuming little-endian '<')
     preamble = struct.unpack('<I', preamble_bytes)[0]
     
@@ -47,9 +48,9 @@ def read_binary_data(stream):
         data = struct.unpack(OBJECT_FORMAT, object_bytes)
         
         
-        raw_r = data[4] # 0x5B (91)
+        raw_r = data[4] 
         raw_g = data[5] # Will be 49, 51, or 52
-        raw_b = data[6] # 0x6D (109)
+        raw_b = data[6] 
 
         COLOR_MAP = {
             49: (1.0, 0.0, 0.0),        #Pure red  
@@ -83,7 +84,10 @@ def main():
     plt.ion() # Turn on interactive mode for live plotting
     plt.style.use('dark_background')
     fig, ax = plt.subplots()
-
+    circle100 = plt.Circle((150, 150), 100, fill=False, linestyle='--')
+    circle75 = plt.Circle((150, 150), 75, fill=False, linestyle='--')
+    circle50 = plt.Circle((150, 150), 50, fill=False, linestyle='--')
+    
     while True:
         try:
             count, objects = read_binary_data(binary_stream)
@@ -91,6 +95,10 @@ def main():
             if count > 0:
                 ax.clear()
                 ax.scatter(150, 150, c='green', s=50, marker='D')
+                ax.add_patch(circle100)
+                ax.add_patch(circle75)
+                ax.add_patch(circle50)
+
                 for obj in objects:    
                     # Extract coordinates and colors
                     x_coord = obj['x'] 
@@ -101,8 +109,8 @@ def main():
                     ax.scatter(x_coord, y_coord, c=color, s=50, marker=symbol) 
                     
                     ax.set_title(f"Objects Received: {count}")
-                    ax.set_xlim(0, 450) # Assuming some bounds for coordinates
-                    ax.set_ylim(0, 450)
+                    ax.set_xlim(0, 300) # Assuming some bounds for coordinates
+                    ax.set_ylim(0, 300)
                     
                 fig.canvas.draw()
                 fig.canvas.flush_events()

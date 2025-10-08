@@ -14,7 +14,7 @@ asio::ip::tcp::iostream establish_connection();
 void get_g_value(const double distance, const uint8_t type, uint8_t *g);
 void parse_line(std::string line, int64_t *id,  int32_t *x, int32_t *y, uint8_t *type);
 void timer_handler(asio::steady_timer &timer, const std::chrono::milliseconds &interval);
-void server_read_thread(asio::ip::tcp::iostream &input);
+void server_read_thread(asio::ip::tcp::iostream &input, asio::io_context &io);
 
 //Structs
 //--------------------------------------------------------------------------------------------------------------
@@ -62,17 +62,21 @@ DataBuffer global_data_buffer;
 
 int main(int argc, char const *argv[])
 {   
-    asio::ip::tcp::iostream input = establish_connection();
-    std::thread read_thread(server_read_thread, std::ref(input));
-    //Since we are outputting to the user every 1.7 seconds but reading continously we should do this asynchronosly
     asio::io_context io;
     asio::steady_timer timer(io);
+    asio::ip::tcp::iostream input = establish_connection();
+    std::thread read_thread(server_read_thread, std::ref(input), std::ref(io));
+    //Since we are outputting to the user every 1.7 seconds but reading continously we should do this asynchronosly
+    
+    
     const auto interval = std::chrono::milliseconds(1700);
+    
     timer.expires_at(timer.expiry() + interval);
     //We handle this with a lambda
     timer.async_wait([&timer, interval](const asio::error_code&){
         timer_handler(timer, interval);
     });
+    
     
     io.run();
     
@@ -90,6 +94,10 @@ asio::ip::tcp::iostream establish_connection(){
     Function to establish tcp connection to server 
     */
     asio::ip::tcp::iostream input("localhost", "5463");
+    if (!input){
+        std::clog << "Error in establish_connection: No connection established" << std::endl;
+        throw std::runtime_error("Connection establishment failed.");
+    }
     return input;
 }
 
@@ -197,7 +205,6 @@ void timer_handler(asio::steady_timer &timer, const std::chrono::milliseconds &i
         //No objects to write -- raise error to clog
         std::clog << "Error in timer_handler: No objects read from buffer" << std::endl;
     }
-
     //Schedule new expiry
     timer.expires_at(timer.expiry() + interval);
     //We handle this with a lambda
@@ -207,7 +214,7 @@ void timer_handler(asio::steady_timer &timer, const std::chrono::milliseconds &i
 }
 
 
-void server_read_thread(asio::ip::tcp::iostream &input){
+void server_read_thread(asio::ip::tcp::iostream &input, asio::io_context &io){
     /*
     Thread for reading from server and writing to global buffer
     */   
@@ -238,6 +245,13 @@ void server_read_thread(asio::ip::tcp::iostream &input){
         global_data_buffer.add_object(object);
         
     }
-
+    //Nothing more to read
+    if(input.fail() && !input.eof()){
+        std::clog << "Error in server_read_thread: Input stream failed without reaching EOF" << std::endl;
+    }
+    else{
+        std::clog << "Server has shutdown. " << std::endl;
+        io.stop();
+    }
     
 }
