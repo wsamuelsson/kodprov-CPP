@@ -5,7 +5,7 @@
 #include<asio.hpp>
 #include <cstdint>
 #include <cmath> 
-
+#include <unordered_map>
 
 
 //Declarations
@@ -31,19 +31,26 @@ struct serverObject{
 
 //A buffer for our shared data
 struct DataBuffer{
-    std::vector<serverObject> objects;
+    std::unordered_map<int64_t, serverObject> objects_map;
     std::mutex mtx;
 
     void add_object(serverObject object){
         //Try and wait for lock, destroy ownership when exiting scope
         std::lock_guard<std::mutex> lock(mtx);
-        objects.push_back(object);
+        objects_map[object.id] = std::move(object);
     }
     std::vector<serverObject> extract_batch(){
         //Try and wait for lock, destroy ownership when exiting scope
         std::lock_guard<std::mutex> lock(mtx);
         std::vector<serverObject> batch;
-        batch.swap(objects); //Buffer is moved out and cleared
+        batch.reserve(objects_map.size());
+        
+        for (auto& pair : objects_map) {
+            batch.push_back(std::move(pair.second));
+        }
+        
+        //Clear the map now that the data has been extracted
+        objects_map.clear(); 
         return batch;
     }
 };
@@ -213,6 +220,7 @@ void server_read_thread(asio::ip::tcp::iostream &input){
     //For holding the g value in rgb
     uint8_t g;
     for(std::string str; std::getline(input, str);){
+        
         parse_line(str, &id, &x, &y, &type);
         x_dist = 150.0 - x;
         y_dist = 150.0 - y;
